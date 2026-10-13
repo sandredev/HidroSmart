@@ -16,10 +16,10 @@ export const tabs = [
   { to: "/config", label: "Ajustes", icon: faGear, desc: "Umbrales y plantas" },
 ];
 
-export function Header() {
+export function Header({ headerRef }) {
   const { riegoActivo, modoLLM, humedad } = useFarm();
   return (
-    <header className="sticky top-0 z-30 bg-leaf-400/95 backdrop-blur border-b border-leaf-500/30">
+    <header ref={headerRef} className="fixed top-0 inset-x-0 z-30 bg-leaf-400/95 backdrop-blur border-b border-leaf-500/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
         <div className="w-11 h-11 rounded-2xl bg-white shadow flex items-center justify-center text-2xl animate-float-soft shrink-0">🥒</div>
         <div className="flex-1 min-w-0">
@@ -78,7 +78,7 @@ export function Sidebar() {
   const location = useLocation();
   const { humedad, riegoActivo, aguaHoy, riegos } = useFarm();
   return (
-    <aside className="hidden lg:flex flex-col w-64 xl:w-72 shrink-0 sticky top-[68px] self-start h-[calc(100svh-96px)] bg-white rounded-3xl border border-leaf-100 shadow-[0_4px_20px_-6px_rgba(34,197,94,0.25)] p-4">
+    <aside className="hidden lg:flex flex-col w-64 xl:w-72 shrink-0 sticky top-[77px] self-start h-[calc(100svh-96px)] bg-white rounded-3xl border border-leaf-100 shadow-[0_4px_20px_-6px_rgba(34,197,94,0.25)] p-4">
       <p className="text-[10.5px] font-extrabold uppercase tracking-widest text-gray-400 px-2 mb-2">Navegación</p>
       <nav className="flex flex-col gap-1.5">
         {tabs.map(({ to, label, icon, end, desc }) => {
