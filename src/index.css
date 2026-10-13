@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Quicksand", "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  --color-leaf-50: #f0fdf4;
+  --color-leaf-100: #dcfce7;
+  --color-leaf-200: #bbf7d0;
+  --color-leaf-300: #86efac;
+  --color-leaf-400: #4ade80;
+  --color-leaf-500: #22c55e;
+  --color-leaf-600: #16a34a;
+  --color-leaf-700: #15803d;
+  --color-leaf-800: #166534;
+  --color-leaf-900: #14532d;
+
+  --color-cream: #fffdf5;
+  --color-soil-100: #f5efe4;
+  --color-soil-500: #a1805a;
+  --color-soil-800: #4a3a28;
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: #e8f7ec;
+  color: #1f2937;
+  min-height: 100svh;
+}
+
+/* Scrollbar suave mobile */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #86efac;
+  border-radius: 99px;
+}
+
+/* Animaciones */
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+@keyframes grow-bar {
+  from { width: 0; }
+}
+.animate-float-soft {
+  animation: float-soft 4s ease-in-out infinite;
+}
