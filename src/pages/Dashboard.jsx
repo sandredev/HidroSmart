@@ -1,106 +1,147 @@
-import { Link } from "react-router-dom";
-import {
-  faDroplet,
-  faLeaf,
-  faStopwatch,
-  faBell,
-  faChevronRight,
-  faRobot,
-  faPowerOff,
-} from "@fortawesome/free-solid-svg-icons";
-import { Fa } from "../components/FaIcon";
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { useFarm } from "../context/FarmContext";
-import { Card, SectionTitle } from "../components/Layout";
-import { MoistureGauge } from "../components/MoistureGauge";
+import { Link } from 'react-router-dom'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { faArrowRight, faDroplet, faPowerOff, faWifi } from '@fortawesome/free-solid-svg-icons'
+import { EmptyState, Icon, PageIntro } from '../components/Interface.jsx'
+import { formatDate, formatNumber, formatTime } from '../lib/demo.js'
 
-function Stat({ icon, label, value, sub, accent }) {
-  return (
-    <div className={`rounded-2xl p-3 border ${accent} flex-1 min-w-0`}>
-      <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide opacity-70">{icon}{label}</div>
-      <div className="font-display font-bold text-xl leading-tight mt-0.5 truncate">{value}</div>
-      {sub && <div className="text-[11px] font-semibold opacity-70 truncate">{sub}</div>}
-    </div>
-  );
+const connectionLabels = {
+  normal: 'Conexión simulada', offline: 'Sin conexión', empty: 'Sin comunicación',
+  error: 'Error de comunicación', loading: 'Consultando estado…',
 }
 
-export default function Dashboard() {
-  const { serie, riegos, decisiones, cantidadPlantas, tiempoMaxRiego, umbralMin, umbralMax, aguaHoy, riegoActivo, minutosRegando, iniciarRiego, detenerRiego, humedad, modoLLM } = useFarm();
-
-  const data = serie.slice(-24).map((p) => ({ ...p, hora: new Date(p.t).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" }) }));
-  const ultimas = [...decisiones].slice(-3).reverse();
+function Moisture({ demo }) {
+  const { reading, scenario, settings } = demo
+  const humidity = reading?.humidity
+  const range = humidity < settings.min
+    ? 'Por debajo del mínimo'
+    : humidity > settings.max ? 'Por encima del máximo' : 'En el rango configurado'
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 pb-2">
-      {modoLLM === "control" && (
-        <div className="bg-red-500 text-white rounded-2xl px-3.5 py-2.5 text-[12px] font-bold shadow flex gap-2 items-start">
-          <span className="text-base">⚠️</span>
-          <span>Modo <b>CONTROL TOTAL</b> activo: el LLM puede cambiar umbrales y tiempos. Úsalo solo para pruebas. <Link to="/asistente" className="underline">Revisar →</Link></span>
-        </div>
-      )}
-
-      {/* Stats: 2 col móvil · 4 col tablet/desktop */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-        <Stat icon={<Fa icon={faLeaf} size={12} />} label="Plantas" value={`🥒 ${cantidadPlantas}`} sub="pepino · floración" accent="bg-leaf-100 border-leaf-200 text-leaf-900" />
-        <Stat icon={<Fa icon={faDroplet} size={12} />} label="Agua hoy" value={`${aguaHoy} L`} sub={`${riegos.length} riegos`} accent="bg-sky-50 border-sky-100 text-sky-900" />
-        <Stat icon={<Fa icon={faStopwatch} size={12} />} label="T. máx riego" value={`${tiempoMaxRiego} min`} sub={riegoActivo ? `regando ${minutosRegando} min` : "límite seguridad"} accent="bg-amber-50 border-amber-100 text-amber-900" />
-        <Stat icon={<Fa icon={faBell} size={12} />} label="Umbrales" value={`${umbralMin}–${umbralMax}%`} sub="min – máx" accent="bg-violet-50 border-violet-100 text-violet-900" />
+    <section className="moisture" aria-labelledby="humedad">
+      <div className="moisture-heading">
+        <h2 id="humedad">Humedad del suelo</h2>
+        <span className="device-label">Sensor · Escala relativa</span>
       </div>
-
-      {/* Contenido: 1 col móvil · 2 col desktop */}
-      <div className="grid gap-3 sm:gap-4 xl:grid-cols-5 items-start">
-        <div className="flex flex-col gap-3 sm:gap-4 xl:col-span-2">
-          <MoistureGauge />
-          <Card>
-            <div className="flex flex-col sm:flex-row xl:flex-col gap-2">
-              {!riegoActivo ? (
-                <button onClick={() => iniciarRiego(`Riego manual desde la app. Humedad ${humedad}%`, "manual")} className="flex-1 bg-leaf-400 hover:bg-leaf-500 active:scale-[0.98] text-leaf-900 font-extrabold rounded-2xl py-3 flex items-center justify-center gap-2 shadow transition">
-                  <Fa icon={faPowerOff} size={18} /> Regar ahora
-                </button>
-              ) : (
-                <button onClick={() => detenerRiego("Detenido manualmente desde la app.")} className="flex-1 bg-gray-800 hover:bg-gray-900 active:scale-[0.98] text-white font-extrabold rounded-2xl py-3 flex items-center justify-center gap-2 shadow transition">
-                  <Fa icon={faPowerOff} size={18} /> Detener riego
-                </button>
-              )}
-              <Link to="/asistente" className="flex-1 bg-leaf-900 hover:bg-black active:scale-[0.98] text-white font-extrabold rounded-2xl py-3 flex items-center justify-center gap-2 shadow transition">
-                <Fa icon={faRobot} size={18} /> Preguntar al LLM
-              </Link>
-            </div>
-          </Card>
+      {reading ? (
+        <div className="readout">
+          <span className="moisture-value">{formatNumber(humidity)}<span>%</span></span>
+          <div className="reading-details">
+            <p className="reading-range">
+              {scenario === 'offline' ? 'Última lectura disponible' : range}
+            </p>
+            <p className="reading-time">Lectura de las <time dateTime={new Date(reading.at).toISOString()}>{formatTime(reading.at)}</time></p>
+          </div>
         </div>
+      ) : <EmptyState scenario={scenario} fallback="Todavía no hay una lectura válida." />}
+    </section>
+  )
+}
 
-        <div className="flex flex-col gap-3 sm:gap-4 xl:col-span-3">
-          <Card>
-            <SectionTitle emoji="📈" title="Humedad últimas horas" sub="Cada punto ≈ 30 min · banda verde = rango óptimo" right={<Link to="/historial" className="text-[12px] font-extrabold text-leaf-600 flex items-center">Ver día <Fa icon={faChevronRight} size={14} /></Link>} />
-            <div className="h-44 sm:h-56 -mx-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ left: -18, right: 8, top: 4, bottom: 0 }}>
-                  <XAxis dataKey="hora" tick={{ fontSize: 9, fontWeight: 700 }} interval={5} tickLine={false} axisLine={false} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 9, fontWeight: 700 }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: 14, fontSize: 12, fontWeight: 700 }} formatter={(v) => [`${v}%`, "Humedad"]} />
-                  <Area type="monotone" dataKey="humedad" stroke="#16a34a" strokeWidth={2.5} fill="#86efac" fillOpacity={0.45} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
+function Pump({ demo }) {
+  const { active, scenario, toggleIrrigation, settings } = demo
+  const available = scenario === 'normal'
+  const running = available && Boolean(active)
+  const label = available ? running ? 'Riego en curso' : 'Riego detenido' : 'Estado desconocido'
+  const details = running
+    ? `Inicio a las ${formatTime(active.at)}. Límite de este ciclo: ${active.limit} s.`
+    : `Límite configurado: ${settings.seconds} s por ciclo.`
 
-          <Card>
-            <SectionTitle emoji="🧠" title="Decisiones de hoy" sub="Qué hizo el sistema y por qué" right={<Link to="/historial" className="text-[12px] font-extrabold text-leaf-600 flex items-center">Todas <Fa icon={faChevronRight} size={14} /></Link>} />
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-              {ultimas.map((d) => (
-                <div key={d.id} className="flex gap-2.5 items-start bg-leaf-50 border border-leaf-100 rounded-2xl px-3 py-2.5">
-                  <span className="text-lg leading-none mt-0.5">{d.tipo === "riego" ? "💧" : d.tipo === "alerta" ? "⚠️" : d.tipo === "llm" ? "🤖" : "ℹ️"}</span>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-extrabold text-gray-800 leading-tight">{d.titulo}</p>
-                    <p className="text-[12px] text-gray-500 font-medium leading-snug line-clamp-2">{d.detalle}</p>
-                    <p className="text-[10.5px] font-bold text-gray-400 mt-0.5">{new Date(d.at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+  return (
+    <section className="pump" aria-labelledby="bomba">
+      <div className="pump-controls">
+        <h2 id="bomba">Control de riego</h2>
+        <p className="pump-status" data-state={available ? running ? 'active' : 'idle' : 'unknown'} role="status">
+          <span className="dot" />{label}
+        </p>
+        <p className="pump-details">{details}</p>
+        <button type="button" className={`button ${running ? 'button-stop' : 'button-water'}`} disabled={!available} onClick={toggleIrrigation}>
+          <Icon icon={running ? faPowerOff : faDroplet} /> {running ? 'Detener riego' : 'Iniciar riego'}
+        </button>
+        {!available && <p className="pump-note">Control manual no disponible</p>}
+      </div>
+      <div className="crop-photo">
+        <img src="/cultivo-pepino.webp" width="900" height="600" alt="" />
+      </div>
+    </section>
+  )
+}
+
+function MoistureChart({ points, settings, scenario, events }) {
+  const last = points.at(-1)
+  const visibleEvents = last ? events.filter(({ at }) => at >= points[0].at && at <= last.at) : []
+  return (
+    <section className="trend" aria-labelledby="tendencia">
+      <div className="trend-heading">
+        <h2 id="tendencia">Lecturas de hoy</h2>
+        <div className="chart-legend">
+          <span className="chart-key"><i aria-hidden="true" />Rango {formatNumber(settings.min)}–{formatNumber(settings.max)}%</span>
+          {visibleEvents.length > 0 && <span className="chart-key chart-key-event"><i aria-hidden="true" />Inicio de riego</span>}
         </div>
       </div>
-    </div>
-  );
+      {last ? (
+        <>
+          <div className="chart" aria-hidden="true">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <LineChart accessibilityLayer={false} data={points} margin={{ top: 10, right: 12, left: -14, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="var(--grid-line)" />
+                <XAxis dataKey="at" type="number" domain={['dataMin', 'dataMax']} tickFormatter={formatTime} minTickGap={24} axisLine={false} tickLine={false} tick={{ fill: 'var(--muted)', fontSize: 12 }} />
+                <YAxis unit="%" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} axisLine={false} tickLine={false} tick={{ fill: 'var(--muted)', fontSize: 12 }} />
+                <ReferenceArea y1={settings.min} y2={settings.max} fill="var(--range)" fillOpacity={1} />
+                <ReferenceLine y={settings.min} stroke="var(--range-edge)" strokeDasharray="3 4" />
+                <ReferenceLine y={settings.max} stroke="var(--range-edge)" strokeDasharray="3 4" />
+                {visibleEvents.map(({ id, at }) => <ReferenceLine key={id} x={at} stroke="var(--water)" strokeDasharray="1 5" />)}
+                <Tooltip labelFormatter={formatTime} formatter={(value) => [`${formatNumber(value)}%`, 'Humedad']} />
+                <Line type="linear" dataKey="humidity" stroke="var(--ink-green)" strokeWidth={2.5} isAnimationActive={false}
+                  dot={({ cx, cy, index }) => index === points.length - 1
+                    ? <circle key={index} cx={cx} cy={cy} r={4} fill="var(--ink-green)" stroke="var(--paper)" strokeWidth={2} />
+                    : null} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <details className="chart-data">
+            <summary>Ver valores de la gráfica</summary>
+            <ul>{points.map(({ at, humidity }, i) => (
+              <li key={i}><time dateTime={new Date(at).toISOString()}>{formatTime(at)}</time><strong>{formatNumber(humidity)}%</strong></li>
+            ))}</ul>
+            {visibleEvents.length > 0 && <p className="chart-events">Inicios de riego: {visibleEvents.map(({ at }) => formatTime(at)).reverse().join(', ')}.</p>}
+          </details>
+        </>
+      ) : <EmptyState scenario={scenario} fallback="Aún no hay lecturas para graficar." />}
+    </section>
+  )
+}
+
+export default function Dashboard({ demo }) {
+  const { events, now, scenario, settings } = demo
+  const closed = events.filter((event) => event.seconds !== null)
+  const volumes = closed.filter((event) => event.volume != null)
+  const volume = volumes.reduce((sum, event) => sum + event.volume, 0)
+
+  return (
+    <>
+      <PageIntro title="Estado del cultivo" description={formatDate(now)}>
+        <span className={`connection ${scenario === 'normal' ? 'connected' : ''}`} role="status">
+          <Icon icon={faWifi} />{connectionLabels[scenario]}
+        </span>
+      </PageIntro>
+      <div className="overview">
+        <Moisture demo={demo} />
+        <Pump demo={demo} />
+        <MoistureChart points={demo.points} scenario={scenario} settings={settings} events={events} />
+      </div>
+      <section className="day-summary" aria-labelledby="resumen-dia">
+        <div className="day-summary-heading">
+          <h2 id="resumen-dia">Resumen de hoy</h2>
+          <Link className="text-link" to="/historial">Ver historial <Icon icon={faArrowRight} /></Link>
+        </div>
+        <dl className="summary-strip">
+          <div><dt>Plantas en el ensayo</dt><dd>{settings.plants}</dd></div>
+          <div><dt>Riegos registrados</dt><dd>{['error', 'loading'].includes(scenario) ? '—' : events.length}</dd></div>
+          <div><dt>Agua estimada</dt><dd>{volumes.length ? `${formatNumber(volume)} L` : '—'}</dd>
+            {volumes.length > 0 && volumes.length < closed.length && <dd className="summary-note">Total parcial</dd>}
+          </div>
+        </dl>
+      </section>
+    </>
+  )
 }
