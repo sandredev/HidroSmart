@@ -6,9 +6,11 @@ import Historial from './pages/Historial.jsx'
 import Asistente from './pages/Asistente.jsx'
 import Config from './pages/Config.jsx'
 import { useDemo } from './lib/demo.js'
+import { useHidroAi } from './lib/hidroai.js'
 
 export default function App() {
   const demo = useDemo()
+  const chat = useHidroAi(demo)
   const { pathname } = useLocation()
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard demo={demo} />} />
         <Route path="/historial" element={<Historial demo={demo} />} />
-        <Route path="/asistente" element={<Asistente demo={demo} />} />
+        <Route path="/asistente" element={<Asistente demo={demo} chat={chat} />} />
         <Route path="/config" element={<Config demo={demo} />} />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>

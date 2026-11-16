@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/hidroai/chat.js": { "maxDuration": 35 }
+  },
+  "rewrites": [
+    { "source": "/historial", "destination": "/index.html" },
+    { "source": "/config", "destination": "/index.html" },
+    { "source": "/asistente", "destination": "/index.html" }
+  ]
+}
