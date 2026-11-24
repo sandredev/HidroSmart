@@ -167,6 +167,7 @@ test('proxy remoto rechaza escrituras si falta el token de operador', async () =
     SUPABASE_BASEURL: 'https://example.supabase.co/functions/v1',
     SUPABASE_PUBLISHABLE_KEY: 'test-publishable',
     SUPABASE_DEVICE_ID: 'registered-device',
+    SUPABASE_COMMANDS_ENABLED: 'true',
   }, async () => { throw new Error('No debe invocar Supabase') })
   const response = await proxy(new Request('http://localhost/api/farm/comando', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -174,4 +175,20 @@ test('proxy remoto rechaza escrituras si falta el token de operador', async () =
   }))
   assert.equal(response.status, 503)
   assert.equal((await response.json()).error.codigo, 'OPERADOR_SIN_CONFIGURAR')
+})
+
+test('proxy remoto bloquea comandos hasta que el firmware esté preparado', async () => {
+  const proxy = createFarmHandler({
+    SUPABASE_BASEURL: 'https://example.supabase.co/functions/v1',
+    SUPABASE_PUBLISHABLE_KEY: 'test-publishable',
+    SUPABASE_OPERATOR_TOKEN: 'operator-secret',
+    SUPABASE_DEVICE_ID: 'registered-device',
+    SUPABASE_COMMANDS_ENABLED: 'false',
+  }, async () => { throw new Error('No debe invocar Supabase') })
+  const response = await proxy(new Request('http://localhost/api/farm/comando', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: 'browser-id', accion: 'iniciar' }),
+  }))
+  assert.equal(response.status, 503)
+  assert.equal((await response.json()).error.codigo, 'COMANDOS_DESHABILITADOS')
 })
