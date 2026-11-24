@@ -102,6 +102,9 @@ export function createFarmHandler(env, fetchApi = fetch) {
       const input = JSON.parse(text)
       if (command) {
         if (!['iniciar', 'detener'].includes(input?.accion) || typeof input.id !== 'string' || input.id.length > 100) throw new ApiError('Comando inválido.', 422, 'DATOS_INVALIDOS')
+        if (!local && env.SUPABASE_COMMANDS_ENABLED !== 'true') {
+          throw new ApiError('El control manual se habilitará cuando el dispositivo pueda confirmar órdenes.', 503, 'COMANDOS_DESHABILITADOS')
+        }
         const body = local
           ? { id: input.id, accion: input.accion }
           : { dispositivo_id: env.SUPABASE_DEVICE_ID || env.HIDROSMART_DEVICE_ID, accion: input.accion === 'iniciar' ? 'iniciar_riego' : 'detener_riego' }
