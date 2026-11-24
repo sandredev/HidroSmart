@@ -12,7 +12,8 @@ const questions = [
 
 function TrialContext({ demo }) {
   const { reading, settings, scenario, active } = demo
-  const pump = scenario === 'normal' ? active ? 'En curso' : 'Detenido' : 'Estado desconocido'
+  const known = demo.source === 'api' ? demo.pumpActive !== null : scenario === 'normal'
+  const pump = known ? active ? 'En curso' : 'Detenido' : 'Estado desconocido'
   return (
     <aside className="chat-context" aria-labelledby="datos-prueba">
       <h2 id="datos-prueba">Datos de la prueba</h2>
@@ -24,10 +25,10 @@ function TrialContext({ demo }) {
         </div>
         <div>
           <dt>Rango configurado</dt>
-          <dd>{formatNumber(settings.min)}–{formatNumber(settings.max)}%</dd>
+          <dd>{settings.min == null ? 'Sin configuración' : `${formatNumber(settings.min)}–${formatNumber(settings.max)}%`}</dd>
         </div>
         <div><dt>Riego</dt><dd>{pump}</dd></div>
-        <div><dt>Plantas</dt><dd>{settings.plants}</dd></div>
+        <div><dt>Sensores</dt><dd>1</dd></div>
       </dl>
     </aside>
   )

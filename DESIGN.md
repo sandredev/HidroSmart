@@ -19,3 +19,10 @@ Cuaderno de cultivo para un dispositivo que se consulta durante un ensayo. El pa
 [cultivo-pepino.webp](public/cultivo-pepino.webp) se generó con ImageGen y se exportó a WebP para el panel.
 
 > Editorial field photograph for a cucumber irrigation dashboard: overhead close-up of broad textured cucumber leaves and one small yellow blossom in dark moist soil, with a simple black drip line through the bed. Midmorning sidelight, olive and leaf greens, warm earthen tones, natural imperfections, strong tactile detail. Landscape 3:2, focal leaves toward the center-right, edge-to-edge crop, no text or graphics.
+
+## Temas
+
+- El selector de cabecera ofrece Automático, Claro y Oscuro; la preferencia se guarda en el navegador. Automático sigue los cambios del sistema.
+- El tema oscuro conserva la identidad botánica: fondo verde profundo `#171e18`, superficies `#20291f`, bandas oliva `#283425` y texto cálido `#eeeede`.
+- Los colores de texto y de relleno de botones usan roles separados para mantener contraste en ambos temas. Gráficos, formularios, alertas y chat comparten las variables semánticas.
+- El tema se aplica antes del primer render para evitar un destello claro al cargar.

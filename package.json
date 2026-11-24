@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "test:api": "node scripts/test-supabase.mjs",
+    "setup:local": "node scripts/setup-local.mjs",
+    "api:local": "node scripts/local-api.mjs",
+    "dev:lan": "vite --host 0.0.0.0",
     "preview": "vite preview"
   },
   "dependencies": {

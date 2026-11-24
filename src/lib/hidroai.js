@@ -5,6 +5,7 @@ export const maxQuestionLength = 1000
 
 const scenarioLabels = {
   normal: 'Operación normal',
+  uncalibrated: 'Dispositivo conectado; el sensor todavía no tiene una lectura calibrada válida.',
   offline: 'Sin conexión. La lectura, si existe, es anterior a la desconexión.',
   empty: 'Sin datos',
   error: 'Error de comunicación',
@@ -20,8 +21,8 @@ function buildDemoContext(demo) {
     rango_relativo_pct: [settings.min, settings.max],
     limite_riego_segundos: settings.seconds,
     lectura: reading ? { humedad_relativa_pct: reading.humidity, fecha: new Date(reading.at).toISOString() } : null,
-    bomba_activa: scenario === 'normal' ? Boolean(active) : null,
-    riegos_registrados_hoy: events.length ? events.length : scenario === 'normal' ? 0 : null,
+    bomba_activa: ['normal', 'uncalibrated'].includes(scenario) ? Boolean(active) : null,
+    riegos_registrados_hoy: events.length ? events.length : ['normal', 'uncalibrated'].includes(scenario) ? 0 : null,
     ultimos_riegos: events.slice(0, 8).map(({ at, reason, seconds, plants, volume }) => ({
       inicio: new Date(at).toISOString(), motivo: reason, duracion_segundos: seconds,
       plantas: plants, agua_estimada_litros: volume ?? null,
@@ -36,7 +37,8 @@ async function askHidroAi(question, demo, turns, signal) {
     signal,
     body: JSON.stringify({
       pregunta: question,
-      contexto_demo: buildDemoContext(demo),
+      origen: demo.source === 'api' ? 'api' : 'demo',
+      ...(demo.source === 'api' ? {} : { contexto_demo: buildDemoContext(demo) }),
       turnos: turns.filter((turn) => turn.answer).slice(-maxTurnsForModel)
         .map(({ question, answer }) => ({ pregunta: question, respuesta: answer })),
     }),

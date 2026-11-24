@@ -1,15 +1,24 @@
 import { useEffect } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import { Shell } from './components/Interface.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Historial from './pages/Historial.jsx'
 import Asistente from './pages/Asistente.jsx'
 import Config from './pages/Config.jsx'
 import { useDemo } from './lib/demo.js'
+import { useFarm } from './lib/farm.js'
 import { useHidroAi } from './lib/hidroai.js'
 
 export default function App() {
-  const demo = useDemo()
+  const [params, setParams] = useSearchParams()
+  const simulated = params.get('demo') === '1'
+  const example = useDemo()
+  const live = useFarm(!simulated)
+  const demo = simulated ? { ...example, source: 'demo' } : live
+  return <FarmInterface key={demo.source} demo={demo} setSource={value => setParams(value === 'demo' ? { demo: '1' } : {})} />
+}
+
+function FarmInterface({ demo, setSource }) {
   const chat = useHidroAi(demo)
   const { pathname } = useLocation()
 
@@ -19,7 +28,7 @@ export default function App() {
   }, [pathname])
 
   return (
-    <Shell demo={demo}>
+    <Shell demo={demo} setSource={setSource}>
       <Routes>
         <Route path="/" element={<Dashboard demo={demo} />} />
         <Route path="/historial" element={<Historial demo={demo} />} />
