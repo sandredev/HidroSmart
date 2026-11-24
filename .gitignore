@@ -10,6 +10,10 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+data/
+firmware/config.local.h
+firmware/.pio/
+firmware/build/
 *.local
 .env
 .env.*
@@ -25,3 +29,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+firmware/supabase.local.h

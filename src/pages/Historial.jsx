@@ -2,8 +2,8 @@ import { EmptyState, PageIntro } from '../components/Interface.jsx'
 import { formatDate, formatNumber, formatTime } from '../lib/demo.js'
 
 function Event({ event }) {
-  const { at, seconds, reason, volume, plants } = event
-  const inProgress = seconds === null
+  const { at, seconds, reason, volume, plants, end, volumeType, volumeUnit } = event
+  const inProgress = end === undefined ? seconds === null : end === null
   return (
     <li className="irrigation-event">
       <div className="event-start">
@@ -13,11 +13,11 @@ function Event({ event }) {
       <dl className="event-data">
         <div>
           <dt>Fin</dt>
-          <dd>{inProgress ? <span className="event-progress">En curso</span> : formatTime(at + seconds * 1000)}</dd>
+          <dd>{inProgress ? <span className="event-progress">En curso</span> : formatTime(end ?? at + seconds * 1000)}</dd>
         </div>
-        <div><dt>Duración</dt><dd>{inProgress ? '—' : `${seconds} s`}</dd></div>
-        <div><dt>Plantas</dt><dd>{plants}</dd></div>
-        <div><dt>Agua estimada</dt><dd>{volume == null ? '—' : `${formatNumber(volume)} L`}</dd></div>
+        <div><dt>Duración</dt><dd>{seconds == null ? '—' : `${seconds} s`}</dd></div>
+        {plants != null && <div><dt>Plantas</dt><dd>{plants}</dd></div>}
+        <div><dt>{volumeType === 'medido' ? 'Agua medida' : volumeType === 'estimado' || plants != null ? 'Agua estimada' : 'Volumen'}</dt><dd>{volume == null ? '—' : formatNumber(volume) + (volumeUnit === 'litros' || plants != null ? ' L' : '')}</dd></div>
       </dl>
     </li>
   )

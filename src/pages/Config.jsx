@@ -16,30 +16,39 @@ function NumberField({ id, label, value, onChange, min, max, step, unit }) {
 }
 
 export default function Config({ demo }) {
-  const [draft, setDraft] = useState(demo.settings)
+  const [edits, setEdits] = useState(null)
+  const draft = edits ?? demo.settings
   const [feedback, setFeedback] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   function edit(field, value) {
-    setDraft((current) => ({ ...current, [field]: value }))
+    setEdits({ ...draft, [field]: value })
     setFeedback(null)
   }
 
-  function save(event) {
+  async function save(event) {
     event.preventDefault()
     const next = Object.fromEntries(Object.entries(draft).map(([key, value]) => [key, value === '' ? NaN : Number(value)]))
-    const error = validateSettings(next)
+    const error = validateSettings({ ...next, plants: demo.source === 'api' ? 1 : next.plants })
     if (error) {
       setFeedback({ error, message: error })
       return
     }
-    const persisted = demo.updateSettings(next)
-    setFeedback({ message: persisted ? 'Ajustes guardados en este navegador.' : 'Ajustes aplicados para esta sesión.' })
+    if (saving) return
+    setSaving(true)
+    try {
+      const persisted = await demo.updateSettings(next)
+      setEdits(null)
+      setFeedback({ message: demo.source === 'api' ? 'Configuración guardada en la API.' : persisted ? 'Ajustes guardados en este navegador.' : 'Ajustes aplicados para esta sesión.' })
+    } catch (error) {
+      setFeedback({ error: true, message: error.message })
+    } finally { setSaving(false) }
   }
 
   return (
     <>
       <PageIntro title="Ajustes del cultivo" />
-      <form className="settings" onSubmit={save} autoComplete="off" noValidate>
+      {demo.settings.min == null ? <p className="empty-state">Consulta la configuración de la API antes de editarla.</p> : <form className="settings" onSubmit={save} autoComplete="off" noValidate>
         <fieldset>
           <legend>Humedad del suelo</legend>
           <div className="setting-row">
@@ -51,20 +60,20 @@ export default function Config({ demo }) {
           </div>
         </fieldset>
         <fieldset>
-          <legend>Riego y plantas</legend>
+          <legend>Riego</legend>
           <div className="setting-row">
-            <p>El límite se aplica a cada ciclo. Registra de una a tres plantas para identificar la prueba en el historial.</p>
+            <p>El límite se aplica a cada ciclo de riego.</p>
             <div className="form-grid">
               <NumberField id="seconds" label="Tiempo máximo (s)" value={draft.seconds} onChange={(v) => edit('seconds', v)} min={1} max={300} step={1} unit="s" />
-              <NumberField id="plants" label="Cantidad de plantas" value={draft.plants} onChange={(v) => edit('plants', v)} min={1} max={3} step={1} />
+              {demo.source === 'demo' && <NumberField id="plants" label="Cantidad de plantas" value={draft.plants} onChange={(v) => edit('plants', v)} min={1} max={3} step={1} />}
             </div>
           </div>
         </fieldset>
         <div className="settings-footer">
-          <button className="button button-primary" type="submit">Guardar ajustes</button>
+          <button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar ajustes'}</button>
           {feedback && <p className={feedback.error ? 'form-error' : 'form-success'} role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
         </div>
-      </form>
+      </form>}
     </>
   )
 }
