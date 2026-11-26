@@ -13,13 +13,14 @@
 #define HIDROSMART_SENSOR_DRY_RAW soilDryRaw
 #define HIDROSMART_SENSOR_WET_RAW soilWetRaw
 
-// Adquisicion y envio exclusivamente: ningun GPIO de rele se configura.
+// control_cloud añade control; supabase_sensor conserva adquisición sin relé.
 static uint32_t lastSample = 0, lastSend = 0, lastWifi = 0;
 static bool firstWifi = true;
 static uint32_t sum = 0;
 static uint8_t samples = 0;
 static float raw = 0;
 static bool haveReading = false;
+static uint32_t readingSequence = 0;
 static BearSSL::X509List roots(supabaseRootCa);
 static_assert(HIDROSMART_MEASUREMENT_INTERVAL_MS >= 10000UL, "Intervalo minimo 10 segundos");
 
@@ -120,6 +121,9 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(false);
   Serial.println(F("\nHidroSmart: sensor A0 + Supabase HTTPS."));
+#ifdef HIDROSMART_CONTROLLER
+  Serial.printf("[AUTO] enabled=%d armed=%d locked=%d cycles=%u storage=%d. Espera suelo humedo antes de armar.\n", automaticEnabled, automatic.armed, automatic.locked, automatic.cycles, storageReady);
+#endif
   if (calibrated()) {
     Serial.printf("Calibracion activa: seco %d; humedo %d.\n",
                   HIDROSMART_SENSOR_DRY_RAW, HIDROSMART_SENSOR_WET_RAW);
@@ -144,6 +148,7 @@ void loop() {
     if (++samples == 16) {
       raw = sum / 16.0f;
       haveReading = true;
+      ++readingSequence;
       Serial.printf("[A0] %.1f/1023; Wi-Fi %d.\n", raw, int(WiFi.status()));
       samples = 0;sum = 0;
     }

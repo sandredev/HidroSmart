@@ -1,6 +1,7 @@
 #pragma once
 #include <LittleFS.h>
 #include "pump_control.h"
+#include "automatic_policy.h"
 
 PumpControl cloudPump;
 bool storageReady = false;
@@ -11,6 +12,10 @@ bool needsClose = false;
 bool localCycle = false;
 int lastControlHttp = 0;
 unsigned elapsedSeconds = 1;
+AutomaticPolicy automatic;
+float minimumHumidity = 40, maximumHumidity = 70;
+bool automaticEnabled = true;
+bool automaticCycle = false;
 
 float soilPercent() { return constrain(relativeHumidity(raw, soilDryRaw, soilWetRaw), 0.0f, 100.0f); }
 bool sensorOkay() { return haveReading && raw > 1 && raw < 1022; }
@@ -19,6 +24,8 @@ bool persistControl() {
   StaticJsonDocument<768> doc;
   doc["processed"] = processedId; doc["ackId"] = ackId; doc["ackState"] = ackState;
   doc["eventId"] = eventId; doc["seconds"] = limitSeconds;
+  doc["autoCycles"] = automatic.cycles; doc["autoLocked"] = automatic.locked;
+  doc["minimum"] = minimumHumidity; doc["maximum"] = maximumHumidity;
   File file = LittleFS.open("/control.tmp", "w");
   if (!file) return false;
   size_t written = serializeJson(doc, file);
@@ -28,6 +35,7 @@ bool persistControl() {
 
 void controllerBegin() {
   cloudPump.begin(true); // D1/GPIO5 HIGH -> NPN -> IN bajo. Pull-down externo requerido.
+  LittleFS.setConfig(LittleFSConfig(false));
   storageReady = LittleFS.begin(); // Nunca formatear automáticamente el historial/configuración.
   if (!storageReady) return;
   File file = LittleFS.open("/control.json", "r");
@@ -37,7 +45,11 @@ void controllerBegin() {
       processedId = doc["processed"].as<String>(); ackId = doc["ackId"].as<String>();
       ackState = doc["ackState"].as<String>(); eventId = doc["eventId"].as<String>();
       limitSeconds = constrain(doc["seconds"] | 5U, 1U, 30U);
-    }
+      automatic.cycles = doc["autoCycles"] | 0U;
+      automatic.locked = doc["autoLocked"] | false;
+      float lo = doc["minimum"] | 40.0f, hi = doc["maximum"] | 70.0f;
+      if (lo >= 0 && hi <= 100 && lo < hi) { minimumHumidity = lo; maximumHumidity = hi; }
+    } else { storageReady = false; automatic.suspend(); }
     file.close();
   }
   // Tras reinicio jamás reanudar un riego ni inventar duración del ciclo interrumpido.
@@ -46,12 +58,24 @@ void controllerBegin() {
 
 void controllerSafety() {
   cloudPump.check(sensorOkay());
+  if (cloudPump.running() && soilPercent() >= maximumHumidity) cloudPump.stop();
   if (cloudPump.running() && !localCycle && WiFi.status() != WL_CONNECTED) cloudPump.stop();
   static bool wasActive = false;
   if (wasActive && !cloudPump.running()) {
     elapsedSeconds = constrain(unsigned((millis() - runStarted + 500) / 1000), 1U, unsigned(limitSeconds));
     needsClose = eventId.length();
     localCycle = false;
+    if (automaticCycle) {
+      File log = LittleFS.open("/automatic-last.json", "w");
+      if (log) {
+        StaticJsonDocument<384> record;
+        record["duration_seconds"] = elapsedSeconds; record["humidity_after"] = soilPercent();
+        record["humidity_before"] = automatic.before; record["cycle"] = automatic.cycles;
+        record["recorded_epoch"] = long(time(nullptr)); record["remote_event_id"] = eventId;
+        serializeJson(record, log); log.close();
+      }
+      automaticCycle = false;
+    }
     Serial.println("[CONTROL] Salida apagada; cierre de evento pendiente.");
   }
   wasActive = cloudPump.running();
@@ -65,6 +89,43 @@ bool cloudJson(const char* route, JsonDocument& payload, DynamicJsonDocument& re
   return code >= 200 && code < 300 && reply["ok"] == true;
 }
 
+void automaticStep() {
+  static uint32_t seen = 0;
+  if (seen == readingSequence) return;
+  seen = readingSequence;
+  const bool previouslyLocked = automatic.locked;
+  bool ready = automatic.ready(soilPercent(), sensorOkay(), cloudPump.running(), millis(), minimumHumidity);
+  if (!previouslyLocked && automatic.locked) {
+    persistControl();
+    Serial.println("[AUTO] BLOQUEADO: sin aumento de 2 puntos en 3 minutos. Revisar agua, sonda y manguera.");
+  }
+  if (!automaticEnabled || !storageReady || ackId.length() || eventId.length() || needsClose || !ready) return;
+  float humidity = soilPercent();
+  // Reservar presupuesto antes de actuar; reiniciar no concede ciclos nuevos.
+  automatic.started(humidity, millis());
+  if (!persistControl()) { automatic.suspend(); storageReady = false; return; }
+  if (WiFi.status() == WL_CONNECTED && time(nullptr) >= 1700000000) {
+    StaticJsonDocument<384> data; DynamicJsonDocument reply(2048);
+    data["operacion"] = "iniciar"; data["motivo"] = "automatico"; data["humedad_inicio"] = humidity;
+    if (!cloudJson("registrar-evento-riego", data, reply)) {
+      automatic.suspend(); persistControl(); return;
+    }
+    eventId = reply["data"]["id"].as<String>();
+    if (!eventId.length() || !persistControl()) { automatic.suspend(); return; }
+  }
+  // Sin red: protección local y registro local; no inventar un evento remoto.
+  localCycle = true;
+  automaticCycle = true;
+  raw = analogRead(A0);
+  if (sensorOkay() && soilPercent() < minimumHumidity && cloudPump.start(limitSeconds < 5 ? limitSeconds : 5, true)) {
+    runStarted = millis(); Serial.println("[AUTO] Inicio: maximo 5 segundos. Pausa minima 15 minutos.");
+  } else {
+    automatic.suspend(); automaticCycle = false; localCycle = false;
+    if (eventId.length()) { needsClose = true; elapsedSeconds = 1; }
+    persistControl();
+  }
+}
+
 void controllerLoop() {
   // Parada física local disponible aun sin Internet, sin aprobación automática de inicios.
   static String serialLine;
@@ -72,7 +133,11 @@ void controllerLoop() {
     char c = Serial.read();
     if (c == '\n') {
       serialLine.trim();
-      if (serialLine == "detener") { cloudPump.stop(); Serial.println("[CONTROL] Parada local."); }
+      if (serialLine == "detener") { cloudPump.stop(); automatic.suspend(); persistControl(); Serial.println("[CONTROL] Parada local; automatico suspendido."); }
+      if (serialLine == "estado") Serial.printf("[AUTO] habilitado=%d armado=%d bloqueado=%d ciclos=%u; raw=%.1f humedad=%.1f\n", automaticEnabled, automatic.armed, automatic.locked, automatic.cycles, raw, soilPercent());
+      if (serialLine == "rearmar" && !cloudPump.running() && sensorOkay() && soilPercent() >= minimumHumidity + 5) {
+        automatic = AutomaticPolicy(); persistControl(); Serial.println("[AUTO] Rearmado por operador en suelo humedo.");
+      }
       if (serialLine == "iniciar" && !eventId.length() && sensorOkay()) {
         // Aprobación presencial por USB: ciclo fijo de 5 s, aun sin Internet.
         localCycle = true;
@@ -83,6 +148,8 @@ void controllerLoop() {
     } else if (serialLine.length() < 32) serialLine += c;
     else { serialLine = ""; cloudPump.stop(); }
   }
+  controllerSafety();
+  automaticStep();
   controllerSafety();
   if (WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || !storageReady) return;
   const uint32_t now = millis();
@@ -121,6 +188,9 @@ void controllerLoop() {
     if (code == 200 && reply["ok"] == true) {
       unsigned seconds = reply["data"]["configuracion"]["tiempo_maximo_riego_segundos"] | 5U;
       limitSeconds = constrain(seconds, 1U, 30U); persistControl();
+      float lo = reply["data"]["configuracion"]["humedad_minima"] | 40.0f;
+      float hi = reply["data"]["configuracion"]["humedad_maxima"] | 70.0f;
+      if (lo >= 0 && hi <= 100 && lo < hi) { minimumHumidity = lo; maximumHumidity = hi; persistControl(); }
     }
     return;
   }
@@ -138,7 +208,7 @@ void controllerLoop() {
   if (!id.length() || id.length() > 64 || id == processedId) return;
   processedId = id; ackId = id; ackState = "rechazada";
   if (!persistControl()) { storageReady = false; cloudPump.stop(); return; }
-  if (action == "detener_riego") { cloudPump.stop(); ackState = "ejecutada"; }
+  if (action == "detener_riego") { cloudPump.stop(); automatic.suspend(); ackState = "ejecutada"; }
   else if (action == "iniciar_riego" && unexpired && sensorOkay() && !cloudPump.running() && !eventId.length()) {
     StaticJsonDocument<384> data; DynamicJsonDocument result(2048);
     data["operacion"] = "iniciar"; data["motivo"] = "manual"; data["humedad_inicio"] = soilPercent();
