@@ -121,10 +121,10 @@ export function useFarm(enabled) {
     return true
   }
 
-  async function toggleIrrigation() {
+  async function toggleIrrigation(action = data.pumpActive ? 'detener' : 'iniciar') {
     const result = await request('comando', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: crypto.randomUUID(), accion: data.pumpActive ? 'detener' : 'iniciar' }),
+      body: JSON.stringify({ id: crypto.randomUUID(), accion: action }),
     })
     setData(current => ({ ...current, command: result.comando }))
     setRetry(value => value + 1)
