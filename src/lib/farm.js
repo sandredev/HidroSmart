@@ -105,7 +105,7 @@ export function useFarm(enabled) {
               : readingAge > 90_000 || readingAge < -5000 ? 'offline' : 'normal'
       setData(next)
       setNow(currentTime)
-      timer = setTimeout(poll, 10_000)
+      timer = setTimeout(poll, 2_000)
     }
     void poll()
     return () => { disposed = true; controller.abort(); clearTimeout(timer) }
