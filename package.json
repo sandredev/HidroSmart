@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "device:usb": "node scripts/serial-bridge.mjs",
+    "alerts": "node scripts/alerts.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",

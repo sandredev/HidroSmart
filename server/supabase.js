@@ -114,6 +114,7 @@ export function createFarmHandler(env, fetchApi = fetch) {
       const min = input?.umbrales_humedad?.minimo
       const max = input?.umbrales_humedad?.maximo
       const seconds = input?.tiempo_maximo_riego_segundos
+      if (!local && seconds > 30) throw new ApiError('El prototipo admite un máximo de 30 segundos por ciclo.', 422, 'LIMITE_DISPOSITIVO')
       if (![min, max].every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 100) || min >= max || !Number.isInteger(seconds) || seconds <= 0 || seconds > 300) {
         throw new ApiError('Revisa los umbrales y el tiempo máximo de riego.', 422, 'DATOS_INVALIDOS')
       }
