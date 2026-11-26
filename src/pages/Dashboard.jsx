@@ -39,6 +39,8 @@ function Moisture({ demo }) {
 
 function Pump({ demo }) {
   const [sending, setSending] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [stopRequested, setStopRequested] = useState(false)
   const [error, setError] = useState('')
   const { active, scenario, toggleIrrigation, settings } = demo
   const available = demo.source === 'demo' ? scenario === 'normal' : demo.commandsAvailable && demo.pumpActive !== null
@@ -47,8 +49,17 @@ function Pump({ demo }) {
     if (sending || pending) return
     setSending(true)
     setError('')
-    try { await toggleIrrigation() } catch (cause) { setError(cause.message) }
+    setStopRequested(false)
+    try { await toggleIrrigation('iniciar') } catch (cause) { setError(cause.message) }
     finally { setSending(false) }
+  }
+  async function stopIrrigation() {
+    if (stopping) return
+    setStopping(true)
+    setError('')
+    try { await toggleIrrigation('detener'); setStopRequested(true) }
+    catch (cause) { setError(cause.message) }
+    finally { setStopping(false) }
   }
   const known = demo.source === 'api' ? demo.pumpActive !== null : scenario === 'normal'
   const running = known && Boolean(active)
@@ -65,9 +76,13 @@ function Pump({ demo }) {
           <span className="dot" />{label}
         </p>
         <p className="pump-details">{details}</p>
-        <button type="button" className={`button ${running ? 'button-stop' : 'button-water'}`} disabled={!available || sending || pending} onClick={sendCommand}>
-          <Icon icon={running ? faPowerOff : faDroplet} /> {sending ? 'Enviando…' : pending ? 'Esperando al dispositivo…' : running ? 'Detener riego' : 'Iniciar riego'}
+        <button type="button" className="button button-water" disabled={!available || running || sending || stopping || pending} onClick={sendCommand}>
+          <Icon icon={faDroplet} /> {sending ? 'Enviando inicio…' : 'Iniciar riego'}
         </button>
+        <button type="button" className="button button-stop" disabled={stopping || (demo.source === 'demo' ? scenario !== 'normal' : !demo.commandsAvailable)} onClick={stopIrrigation}>
+          <Icon icon={faPowerOff} /> {stopping ? 'Enviando parada…' : 'Detener riego'}
+        </button>
+        {stopRequested && <p className="pump-note" role="status">Parada solicitada. Comprueba que el dispositivo informe riego detenido.</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
         {demo.command && <p className="pump-note" role="status">{({ pendiente: 'Orden pendiente de confirmación.', ejecutada: 'Orden confirmada por el dispositivo.', rechazada: 'El dispositivo rechazó la orden.', vencida: 'La orden venció sin confirmación.', cancelada: 'Orden cancelada.' })[demo.command.estado]}</p>}
         {!available && <p className="pump-note">{demo.source === 'api' && !demo.commandsAvailable ? 'Control manual pendiente de verificar en la API.' : 'Control manual no disponible'}</p>}

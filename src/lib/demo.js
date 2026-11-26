@@ -83,11 +83,13 @@ export function useDemo() {
     }
   }
 
-  function toggleIrrigation() {
+  function toggleIrrigation(action) {
     if (scenario !== 'normal') return
     const at = Date.now()
     setManualEvents((events) => {
       const first = events[0]
+      if (action === 'detener' && first?.seconds !== null) return events
+      if (action === 'iniciar' && first?.seconds === null) return events
       if (first?.seconds === null) {
         const seconds = Math.min(first.limit, Math.max(0, Math.round((at - first.at) / 1000)))
         return [{ ...first, seconds }, ...events.slice(1)]
